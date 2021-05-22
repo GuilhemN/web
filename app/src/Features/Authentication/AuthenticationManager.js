@@ -55,6 +55,77 @@ const AuthenticationManager = {
     })
   },
 
+  doPassportLogin(claims, callback) {
+    query = {
+      thirdPartyIdentifiers: claims.sub
+    }
+
+    // Using Mongoose for legacy reasons here. The returned User instance
+    // gets serialized into the session and there may be subtle differences
+    // between the user returned by Mongoose vs mongojs (such as default values)
+    User.findOne(query, (error, user) => {
+      if (error) {
+        return callback(error)
+      }
+
+      AuthenticationManager.createIfNotExistAndLogin(user, claims, query, callback)
+    })
+  },
+
+  createIfNotExistAndLogin(user, claims, query, callback) {
+    if (!user || !user.hashedPassword) {
+      //create random pass for local userdb, does not get checked for ldap users during login
+      let pass = require("crypto").randomBytes(32).toString("hex")
+      const userRegHand = require('../User/UserRegistrationHandler.js')
+      userRegHand.registerNewUser({
+        email: claims.email,
+        password: pass
+      },
+        function (error, user) {
+          if (error) {
+            callback(error)
+          }
+          user.admin = false
+          user.emails[0].confirmedAt = Date.now()
+          user.thirdPartyIdentifiers.push(claims.sub)
+          user.save()
+          console.log("user %s added to local library", user.email)
+          User.findOne(query, (error, user) => {
+            if (error) {
+              return callback(error)
+            }
+            if (user && user.hashedPassword) {
+              AuthenticationManager.login(user, "randomPass", callback)
+            }
+          }
+          )
+
+
+        })
+      //return callback(null, null)
+    } else {
+      user.email = claims.email;
+      user.save();
+
+      AuthenticationManager.login(user, "randomPass", callback)
+    }
+  },
+
+  //login with any passwd
+  login(user, password, callback) {
+    AuthenticationManager.checkRounds(
+      user,
+      user.hashedPassword,
+      password,
+      function (err) {
+        if (err) {
+          return callback(err)
+        }
+        callback(null, user)
+      }
+    )
+  },
+
   validateEmail(email) {
     const parsed = EmailHelper.parseEmail(email)
     if (!parsed) {

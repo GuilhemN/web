@@ -57,6 +57,9 @@ const {
 const logger = require('logger-sharelatex')
 const _ = require('underscore')
 
+const bodyParser = require('body-parser');
+const passport = require('passport');
+
 module.exports = { initialize }
 
 function initialize(webRouter, privateApiRouter, publicApiRouter) {
@@ -64,10 +67,39 @@ function initialize(webRouter, privateApiRouter, publicApiRouter) {
     webRouter.all('*', AuthenticationController.requireGlobalLogin)
   }
 
-  webRouter.get('/login', UserPagesController.loginPage)
+  webRouter.get('/login',
+    passport.authenticate('oidc', { failureRedirect: '/', failureFlash: true }),
+    function (req, res) {
+      res.redirect('/');
+    }
+  );
+
   AuthenticationController.addEndpointToLoginWhitelist('/login')
 
-  webRouter.post('/login', AuthenticationController.passportLogin)
+  // authentication callback -  this is called successfully
+  webRouter.get('/redirect', (req, res, next) => {
+    passport.authenticate('oidc', (err, user, info) => {
+      console.log(`got the user ${user}`);
+      if (err) {
+        console.log(`error occurred ${err}`);
+      }
+
+      if (err) {
+        return next(err)
+      }
+      if (user) {
+        // `user` is either a user object or false
+        return AuthenticationController.finishLogin(user, req, res, next)
+      } else {
+        if (info.redir != null) {
+          return res.json({ redir: info.redir })
+        } else {
+          return res.json({ message: info })
+        }
+      }
+    })(req, res, next);
+  });
+  AuthenticationController.addEndpointToLoginWhitelist('/redirect')
 
   webRouter.get(
     '/read-only/one-time-login',
@@ -622,8 +654,8 @@ function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthorizationMiddleware.ensureUserCanReadProject,
     Settings.allowAnonymousReadAndWriteSharing
       ? (req, res, next) => {
-          next()
-        }
+        next()
+      }
       : AuthenticationController.requireLogin(),
     MetaController.getMetadata
   )
@@ -632,8 +664,8 @@ function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthorizationMiddleware.ensureUserCanReadProject,
     Settings.allowAnonymousReadAndWriteSharing
       ? (req, res, next) => {
-          next()
-        }
+        next()
+      }
       : AuthenticationController.requireLogin(),
     MetaController.broadcastMetadataForDoc
   )
