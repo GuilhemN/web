@@ -79,32 +79,37 @@ const AuthenticationManager = {
       const userRegHand = require('../User/UserRegistrationHandler.js')
       userRegHand.registerNewUser({
         email: claims.email,
+        first_name: claims.given_name,
+        last_name: claims.family_name,
         password: pass
       },
         function (error, user) {
           if (error) {
-            callback(error)
+            return callback(error)
           }
           user.admin = false
           user.emails[0].confirmedAt = Date.now()
           user.thirdPartyIdentifiers.push(claims.sub)
-          user.save()
-          console.log("user %s added to local library", user.email)
-          User.findOne(query, (error, user) => {
-            if (error) {
-              return callback(error)
+          user.save(function (err, result) {
+            if (err) {
+              return callback(err);
             }
 
-            callback(null, user);
+            console.log("user %s added to local library", user.email)
+            callback(null, result);
           })
-
-
         })
     } else {
       user.email = claims.email;
-      user.save();
+      user.first_name = claims.given_name;
+      user.last_name = claims.family_name;
+      user.save(function (err, result) {
+        if (err) {
+          return callback(err);
+        }
 
-      callback(null, user);
+        callback(null, result);
+      });
     }
   },
 
