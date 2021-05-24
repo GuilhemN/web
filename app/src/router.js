@@ -79,7 +79,7 @@ function initialize(webRouter, privateApiRouter, publicApiRouter) {
   // authentication callback -  this is called successfully
   webRouter.get('/redirect', (req, res, next) => {
     passport.authenticate('oidc', (err, user, info) => {
-      console.log(`got the user ${user}`);
+      console.log(`got the user ${user.email}`);
       if (err) {
         console.log(`error occurred ${err}`);
       }

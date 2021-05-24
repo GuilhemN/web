@@ -94,36 +94,18 @@ const AuthenticationManager = {
             if (error) {
               return callback(error)
             }
-            if (user && user.hashedPassword) {
-              AuthenticationManager.login(user, "randomPass", callback)
-            }
-          }
-          )
+
+            callback(null, user);
+          })
 
 
         })
-      //return callback(null, null)
     } else {
       user.email = claims.email;
       user.save();
 
-      AuthenticationManager.login(user, "randomPass", callback)
+      callback(null, user);
     }
-  },
-
-  //login with any passwd
-  login(user, password, callback) {
-    AuthenticationManager.checkRounds(
-      user,
-      user.hashedPassword,
-      password,
-      function (err) {
-        if (err) {
-          return callback(err)
-        }
-        callback(null, user)
-      }
-    )
   },
 
   validateEmail(email) {
